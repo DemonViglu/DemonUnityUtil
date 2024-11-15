@@ -1,0 +1,17 @@
+{
+	"name": "com.demontool.commontool",
+	"displayName": "DemonUtil",
+	"version": "1.0.0",
+	"unity": "2022.3",
+	"description": "common tool to handle simple engineer problem",
+	"keywords": [
+	  "Save"
+	],
+	"dependencies": {
+	  "com.unity.nuget.newtonsoft-json": "3.2.1"
+	},
+	"author": {
+	  "name": "DemonViglu",
+	  "url": "https://github.com/DemonViglu"
+	}
+}
