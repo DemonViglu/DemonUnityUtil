@@ -23,7 +23,7 @@ public class MissionFactoryView : GraphView
         this.AddManipulator(new SelectionDragger());
         this.AddManipulator(new RectangleSelector());
 
-        var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>("Assets\\MissonUtil\\Editor\\DemonMissionEditor.uss");
+        var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>("Assets\\DemonUtil\\MissonUtil\\Editor\\DemonMissionEditor.uss");
 
         if (styleSheet != null)
         {

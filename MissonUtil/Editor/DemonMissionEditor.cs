@@ -20,7 +20,7 @@ namespace demonviglu.MissonSystem
         {
             // Each editor window contains a root VisualElement object
             VisualElement root = rootVisualElement;
-            var virtualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets\\MissonUtil\\Editor\\DemonMissionEditor.uxml");
+            var virtualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets\\DemonUtil\\MissonUtil\\Editor\\DemonMissionEditor.uxml");
             virtualTree.CloneTree(root);
 
             missionFactoryView = root.Q<MissionFactoryView>();
