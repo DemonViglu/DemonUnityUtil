@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 public class MissionFactoryView : GraphView
@@ -45,6 +46,8 @@ public class MissionFactoryView : GraphView
             MissionNodeManager.RegisterMissionNode(n);
         });
 
+        List<int> TrashID = new();
+
         missionNodes.ForEach(n =>
         {
             MissionNodeView parentView = FindNodeView(n);
@@ -55,11 +58,22 @@ public class MissionFactoryView : GraphView
                 if (node.GUID != MissionNodeManager.Failure)
                 {
                     MissionNodeView childView = FindNodeView(node);
-
                     AddElement(parentView.Output.ConnectTo(childView.Input));
+                }
+                else
+                {
+                    TrashID.Add(childID);
                 }
             }
         });
+
+        foreach(var tmp in missionNodes)
+        {
+            foreach(var id in TrashID)
+            {
+                tmp.Childrens.Remove(id);
+            }
+        }
     }
 
     private GraphViewChange OnGraphViewChanged(GraphViewChange graphViewChange)
@@ -101,7 +115,7 @@ public class MissionFactoryView : GraphView
     public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
     {
         evt.menu.AppendAction($"Create a Node", (a) => CreateNode());
-        evt.menu.AppendAction($"Save&Refresh", (a) => MissionNodeManager.SerialNode());
+        evt.menu.AppendAction($"Save&Refresh", (a) => SaveAndRefresh());
         evt.menu.AppendAction($"ClearState", (a) => MissionNodeManager.Reinit());
     }
 
@@ -113,6 +127,13 @@ public class MissionFactoryView : GraphView
         AddElement(nv);
     }
 
+    private void SaveAndRefresh()
+    {
+        MissionNodeManager.SerialNode();
+        MissionNodeManager.Clear();
+        PopulateView();
+    }
+
     MissionNodeView FindNodeView(MissionNode node)
     {
         return GetNodeByGuid(node.GUID) as MissionNodeView;
@@ -120,7 +141,10 @@ public class MissionFactoryView : GraphView
 
     void CreateNode()
     {
-        var node = new MissionNode();
+        var node = ScriptableObject.CreateInstance<MissionNode>();
+
+        node.ID = UnityEngine.Random.Range(int.MinValue,int.MaxValue);
+
         CreateNodeView(node);
         MissionNodeManager.RegisterMissionNode(node);
         MissionNodeManager.SerialNode();

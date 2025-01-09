@@ -1,3 +1,4 @@
+using demonviglu.bt;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +12,14 @@ namespace demonviglu.MissonSystem
         Success,
         Failure,
         Hide
+    }
+
+    public enum MissionType
+    {
+        Normal,
+        And,
+        Not,
+        Or
     }
     [SerializeField]
     public class MissionNode : BaseNode
@@ -40,14 +49,17 @@ namespace demonviglu.MissonSystem
                             missionManager.CallEvent(id, this);
                         }
                     }
-
                 }
             }
         }
 
+        public MissionType MissionType;
+
         public List<int> Childrens = new();
 
         public bool AutoUnlock;
+
+        public bool AutoSuccess;
 
         public List<int> CallIDs = new();
 
@@ -69,7 +81,7 @@ namespace demonviglu.MissonSystem
             }
             if (CallIDs.Count > 0) s2 += CallIDs[^1];
 
-            return $"{ID}\t{Content}\t{State}\t{s}\t{AutoUnlock}\t{s2}\t{Position.x},{Position.y}";
+            return $"{ID}\t{Content}\t{State}\t{MissionType}\t{s}\t{AutoUnlock}\t{AutoSuccess}\t{s2}\t{Position.x},{Position.y}";
         }
 
         public bool DeSerial(string str)
@@ -83,9 +95,11 @@ namespace demonviglu.MissonSystem
                 ID = int.Parse(list[0]);
                 Content = list[1];
                 State = (MissionState)Enum.Parse(State.GetType(), list[2]);
-                AutoUnlock = bool.Parse(list[4]);
+                MissionType = (MissionType)Enum.Parse(MissionType.GetType(), list[3]);
+                AutoUnlock = bool.Parse(list[5]);
+                AutoSuccess = bool.Parse(list[6]);
             }
-            tmpList = list[3].Split(',').ToList();
+            tmpList = list[4].Split(',').ToList();
             foreach (var child in tmpList)
             {
                 if (int.TryParse(child, out int id))
@@ -94,7 +108,7 @@ namespace demonviglu.MissonSystem
                 }
             }
 
-            tmpList = list[5].Split(',').ToList();
+            tmpList = list[7].Split(',').ToList();
             foreach (var child in tmpList)
             {
                 if (int.TryParse(child, out int id))
@@ -103,7 +117,7 @@ namespace demonviglu.MissonSystem
                 }
             }
 
-            tmpList = list[6].Split(',').ToList();
+            tmpList = list[8].Split(',').ToList();
             if(tmpList.Count > 0)
             {
                 Position.x = float.Parse(tmpList[0]);

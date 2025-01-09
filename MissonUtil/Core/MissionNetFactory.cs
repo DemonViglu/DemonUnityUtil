@@ -32,6 +32,8 @@ public class MissionNetFactory : MonoBehaviour
             MissionNodeManager.RegisterMissionNode(node);
         }
 
+        MissionNodeManager.RefreshLogicNode();
+
         MissionNodeManager.RegisterEvent(BeCalledFunc, 520);
         MissionNodeManager.RegisterEvent(RefreshUIColor);
     }
@@ -92,6 +94,12 @@ public class MissionNetFactory : MonoBehaviour
         {
             MissionNodeManager.SerialNode();
         }
+    }
+
+    [ContextMenu("MakeFailure")]
+    public void MakeFailure()
+    {
+        MissionNodeManager.MakeFailure(ID);
     }
 
 

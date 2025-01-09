@@ -1,6 +1,8 @@
 using demonviglu.config;
+using JetBrains.Annotations;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.VisualScripting;
 using UnityEngine;
 namespace demonviglu.MissonSystem
 {
@@ -8,14 +10,22 @@ namespace demonviglu.MissonSystem
     {
         public delegate void MissionEventDelegate(MissionNode node);
 
+        //ID -> MissionNode
         private Dictionary<int, MissionNode> Dic = new();
 
+        //The Mission's Node is been Locked because:
+        private Dictionary<int, List<int>> LockedParentDic = new();
+
+        //The Mission's whole parent nodes;
         private Dictionary<int, List<int>> ParentDic = new();
 
         private Dictionary<int, List<MissionEventDelegate>> EventDic = new();
 
         private List<MissionEventDelegate> EventList = new();
 
+        private List<MissionNode> LogicNode = new();
+
+        #region For init and graphview
         public bool RegisterMissionNode(MissionNode node)
         {
             if (Dic.ContainsKey(node.ID))
@@ -27,6 +37,25 @@ namespace demonviglu.MissonSystem
                 Dic.Add(node.ID, node);
 
                 node.missionManager = this;
+
+                if (node.MissionType != MissionType.Normal)
+                {
+                    LogicNode.Add(node);
+                }
+                else if (node.State != MissionState.Success && node.State != MissionState.Hide)
+                {
+                    foreach (var childId in node.Childrens)
+                    {
+                        if (LockedParentDic.ContainsKey(childId))
+                        {
+                            LockedParentDic[childId].Add(node.ID);
+                        }
+                        else
+                        {
+                            LockedParentDic[childId] = new List<int>() { node.ID };
+                        }
+                    }
+                }
 
                 foreach (var childId in node.Childrens)
                 {
@@ -74,97 +103,329 @@ namespace demonviglu.MissonSystem
         {
             EventList.Add(med);
         }
+        #endregion
 
         public static string Failure = "DEMONFAILURE";
+
+        /// <summary>
+        /// If Get the GUID == DEMONFAILURE, means no such mission!
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
         public MissionNode GetMissionNode(int id)
         {
             if (Dic.ContainsKey(id))
             {
                 return Dic[id];
             }
-            return new()
-            {
-                GUID = Failure
-            };
+
+            MissionNode ret = ScriptableObject.CreateInstance<MissionNode>();
+            ret.GUID = Failure;
+            return ret;
         }
 
-        public bool MakeProgress(int id)
+        /// <summary>
+        /// The function should be called after all the mission node has been registered
+        /// </summary>
+        public void RefreshLogicNode()
         {
+            bool ret = true;
+            foreach (var node in LogicNode)
+            {
+                switch (node.MissionType)
+                {
+                    case MissionType.And:
+                        ret = MakeAndProgress(node.ID, node, true, ret);
+                        break;
+                    case MissionType.Not:
+                        break;
+                    case MissionType.Or:
+                        ret = MakeOrProgress(node.ID, node, true, ret);
+                        break;
+                }
+            }
+        }
+
+        #region Make Progress;
+        public bool MakeProgress(int id, bool fromParent = false)
+        {
+            bool ret = false;
             MissionNode node = GetMissionNode(id);
             if (node != null)
+            {
+
+                switch (node.MissionType)
+                {
+                    case MissionType.Normal:
+                        ret = MakeNormalProgress(id, node, fromParent, ret);
+                        break;
+                    case MissionType.And:
+                        ret = MakeAndProgress(id, node, fromParent, ret);
+                        break;
+                    case MissionType.Not:
+                        break;
+                    case MissionType.Or:
+                        ret = MakeOrProgress(id, node, fromParent, ret);
+                        break;
+                }
+
+                //需要优化，到底是什么时候触发全体函数
+                if (true)
+                {
+                    foreach (var e in EventList)
+                    {
+                        e.Invoke(node);
+                    }
+                }
+            }
+            else
+            {
+                Debug.Log($"{id} Not Found");
+                ret = false;
+            }
+            return ret;
+        }
+
+        public bool MakeNormalProgress(int id, MissionNode node, bool fromParent, bool ret)
+        {
+            MissionState nextState = node.State;
+            if (fromParent)
+            {
+                if (LockedParentDic.ContainsKey(id) && LockedParentDic[id].Count > 0)
+                {
+                    nextState = MissionState.Locked;
+                }
+                else
+                {
+                    if (node.AutoUnlock && node.State < MissionState.Running)
+                    {
+                        nextState = MissionState.Running;
+                    }
+                    if (node.AutoSuccess && node.State < MissionState.Success)
+                    {
+                        nextState = MissionState.Success;
+                    }
+                }
+            }
+            else
             {
                 switch (node.State)
                 {
                     case MissionState.Locked:
 
-                        if (ParentDic.ContainsKey(id) && ParentDic[id].Count > 0)
+                        if (LockedParentDic.ContainsKey(id) && LockedParentDic[id].Count > 0)
                         {
                             string tmp = string.Empty;
-                            foreach (var sId in ParentDic[id])
+                            foreach (var sId in LockedParentDic[id])
                             {
                                 tmp += sId + ",";
                             }
                             Debug.Log(tmp + "\t To be finished");
-
-                            return false;
+                            break;
                         }
                         else
                         {
-                            node.State = MissionState.Running;
+                            nextState = MissionState.Running;
                         }
                         break;
                     case MissionState.Running:
-
-                        node.State = MissionState.Success;
-                        foreach (var childId in node.Childrens)
-                        {
-                            if (ParentDic.ContainsKey(childId))
-                            {
-                                ParentDic[childId].Remove(node.ID);
-
-                                if (GetMissionNode(childId).AutoUnlock == true && ParentDic[childId].Count == 0)
-                                {
-                                    MakeProgress(childId);
-                                }
-
-                            }
-                        }
+                        nextState = MissionState.Success;
                         break;
                     case MissionState.Success:
-                        node.State = MissionState.Hide;
+                        nextState = MissionState.Hide;
                         break;
                     case MissionState.Failure:
                         Debug.Log($"{id} Has been failed");
-                        return false;
+                        break;
                     case MissionState.Hide:
                         break;
+                }
+            }
+
+            //When node state has changed, try to call the childrenNodde, especailly the logic node
+            //If the node state is success, unlock the children node;
+            //If the node state is locked, lock the chlidren
+            if (nextState != node.State)
+            {
+                node.State = nextState;
+
+                if (nextState != MissionState.Locked)
+                {
+                    ret = true;
+                }
+
+                foreach (var childId in node.Childrens)
+                {
+
+                    if (nextState == MissionState.Success && LockedParentDic.ContainsKey(childId))
+                    {
+                        LockedParentDic[childId].Remove(node.ID);
+                    }
+                    else if (nextState == MissionState.Locked)
+                    {
+                        if (LockedParentDic.ContainsKey(childId))
+                        {
+                            LockedParentDic[childId].Add(node.ID);
+                        }
+                        else
+                        {
+                            LockedParentDic[childId] = new List<int>() { node.ID };
+                        }
+                    }
+
+                    MakeProgress(childId, true);
+                }
+            }
+            else
+            {
+                ret = false;
+            }
+            return ret;
+        }
+
+        /// <summary>
+        /// Only parent can call the logic node
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="node"></param>
+        /// <param name="fromParent"></param>
+        /// <param name="ret"></param>
+        /// <returns></returns>
+        public bool MakeAndProgress(int id, MissionNode node, bool fromParent, bool ret)
+        {
+            MissionState nextState = node.State;
+            if (fromParent)
+            {
+                if (LockedParentDic.ContainsKey(id) && LockedParentDic[id].Count > 0)
+                {
+                    nextState = MissionState.Failure;
+                    ret = false;
+                }
+                else
+                {
+                    nextState = MissionState.Success;
+                    ret = true;
+                }
+
+                //Logic state has changed, so change the children
+                if (nextState != node.State)
+                {
+                    node.State = nextState;
+
+                    if (nextState == MissionState.Success)
+                    {
+                        foreach (var childId in node.Childrens)
+                        {
+                            if (LockedParentDic.ContainsKey(childId))
+                            {
+                                LockedParentDic[childId].Remove(node.ID);
+                            }
+                            MakeProgress(childId, true);
+                        }
+                    }
+                    else if (nextState == MissionState.Failure)
+                    {
+                        foreach (var childId in node.Childrens)
+                        {
+                            if (LockedParentDic.ContainsKey(childId))
+                            {
+                                LockedParentDic[childId].Add(node.ID);
+                            }
+                            else
+                            {
+                                LockedParentDic[childId] = new List<int>() { node.ID };
+                            }
+                            MakeProgress(childId, true);
+                        }
+                    }
+                }
+            }
+            return ret;
+        }
+
+        public bool MakeOrProgress(int id, MissionNode node, bool fromParent, bool ret)
+        {
+            MissionState nextState = node.State;
+            if (fromParent)
+            {
+                //Has at least one node has been success
+                if (LockedParentDic.ContainsKey(id) && LockedParentDic[id].Count == ParentDic[id].Count)
+                {
+                    ret = false;
+                    nextState = MissionState.Failure;
+                }
+                else
+                {
+                    ret = true;
+                    nextState = MissionState.Success;
+                }
+
+                if (nextState != node.State)
+                {
+                    node.State = nextState;
+
+                    if (nextState == MissionState.Success)
+                    {
+                        foreach (var childId in node.Childrens)
+                        {
+                            if (LockedParentDic.ContainsKey(childId))
+                            {
+                                LockedParentDic[childId].Remove(node.ID);
+                            }
+                            MakeProgress(childId, true);
+                        }
+                    }
+                    else if (nextState == MissionState.Failure)
+                    {
+                        foreach (var childId in node.Childrens)
+                        {
+                            if (LockedParentDic.ContainsKey(childId))
+                            {
+                                LockedParentDic[childId].Add(node.ID);
+                            }
+                            else
+                            {
+                                LockedParentDic[childId] = new List<int>() { node.ID };
+                            }
+                            MakeProgress(childId, true);
+                        }
+                    }
+                }
+            }
+            return ret;
+        }
+
+        public bool MakeFailure(int id)
+        {
+            bool ret = false;
+            MissionNode node = GetMissionNode(id);
+            if (node != null)
+            {
+                if (node.State != MissionState.Locked)
+                {
+                    node.State = MissionState.Locked;
+                    foreach (var childId in node.Childrens)
+                    {
+                        if (LockedParentDic.ContainsKey(childId))
+                        {
+                            LockedParentDic[childId].Add(node.ID);
+                        }
+                        else
+                        {
+                            LockedParentDic[childId] = new List<int>() { node.ID };
+                        }
+                        MakeProgress(childId, true);
+                    }
+                    ret = true;
                 }
                 foreach (var e in EventList)
                 {
                     e.Invoke(node);
                 }
-                return true;
             }
-            else
-            {
-                Debug.Log($"{id} Not Found");
-            }
-            return false;
+            return ret;
         }
-
-        public bool MakeFailure(int id)
-        {
-            MissionNode node = GetMissionNode(id);
-            if (node != null)
-            {
-                if (node.State == MissionState.Running)
-                {
-                    node.State = MissionState.Failure;
-                    return true;
-                }
-            }
-            return false;
-        }
+        #endregion
 
         public void CallEvent(int id, MissionNode node)
         {
@@ -177,7 +438,6 @@ namespace demonviglu.MissonSystem
             }
         }
 
-
         public void DebugNode()
         {
             foreach (var kv in Dic)
@@ -188,10 +448,27 @@ namespace demonviglu.MissonSystem
 
         public void Reinit()
         {
-            foreach(var node in Dic.Values)
+            foreach (var node in Dic.Values)
             {
                 node.State = MissionState.Locked;
             }
+        }
+
+        public void Clear()
+        {
+            //ID -> MissionNode
+            Dic.Clear();
+
+            //The Mission's Node is been Locked because:
+            LockedParentDic.Clear();
+
+            ParentDic.Clear();
+
+            EventDic.Clear();
+
+            EventList.Clear();
+
+            LogicNode.Clear();
         }
 
         public string SerialNode()
@@ -218,10 +495,9 @@ namespace demonviglu.MissonSystem
             List<string> list = s.Split('\n').ToList();
             foreach (var item in list)
             {
-                MissionNode node = new();
+                MissionNode node = ScriptableObject.CreateInstance<MissionNode>();
                 if (node.DeSerial(item))
                 {
-                    RegisterMissionNode(node);
                     ret.Add(node);
                 }
             }

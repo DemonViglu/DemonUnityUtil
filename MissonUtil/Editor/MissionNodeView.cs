@@ -15,12 +15,31 @@ public class MissionNodeView : UnityEditor.Experimental.GraphView.Node
     {
         Node = node;
 
-        this.title = node.ID.ToString();
+        this.title = node.Content;
 
         viewDataKey = node.GUID.ToString();
 
         style.left = node.Position.x;
         style.top = node.Position.y;
+
+        switch (node.State)
+        {
+            case MissionState.Locked:
+                style.backgroundColor = Color.grey;
+                break;
+            case MissionState.Running:
+                style.backgroundColor = Color.yellow;
+                break;
+            case MissionState.Success:
+                style.backgroundColor = Color.green;
+                break;
+            case MissionState.Failure:
+                style.backgroundColor = Color.red;
+                break;
+            case MissionState.Hide:
+                style.backgroundColor = Color.white;
+                break;
+        }
 
         Output = InstantiatePort(Orientation.Horizontal, Direction.Output, Port.Capacity.Multi, typeof(bool));
 
