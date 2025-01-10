@@ -17,6 +17,24 @@ public class MissionNodeView : UnityEditor.Experimental.GraphView.Node
 
         this.title = node.Content;
 
+        switch (node.MissionType)
+        {
+            case MissionType.Normal:
+                break;
+            case MissionType.And:
+                title = "And";
+                break;
+            case MissionType.Not:
+                title = "Not";
+                break;
+            case MissionType.Or:
+                title = "Or";
+                break;
+            case MissionType.Locked:
+                title = "Lock";
+                break;
+        }
+
         viewDataKey = node.GUID.ToString();
 
         style.left = node.Position.x;

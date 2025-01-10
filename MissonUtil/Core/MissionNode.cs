@@ -1,4 +1,3 @@
-using demonviglu.bt;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,13 +12,13 @@ namespace demonviglu.MissonSystem
         Failure,
         Hide
     }
-
     public enum MissionType
     {
         Normal,
         And,
         Not,
-        Or
+        Or,
+        Locked
     }
     [SerializeField]
     public class MissionNode : BaseNode
@@ -123,7 +122,6 @@ namespace demonviglu.MissonSystem
                 Position.x = float.Parse(tmpList[0]);
                 Position.y = float.Parse(tmpList[1]);
             }
-
 
             return true;
         }

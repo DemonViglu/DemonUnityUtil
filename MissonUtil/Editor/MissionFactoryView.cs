@@ -34,6 +34,7 @@ public class MissionFactoryView : GraphView
 
     public void PopulateView()
     {
+        MissionNodeManager.Clear();
         missionNodes = MissionNodeManager.DeSerialNode();
 
         graphViewChanged -= OnGraphViewChanged;
@@ -117,6 +118,8 @@ public class MissionFactoryView : GraphView
         evt.menu.AppendAction($"Create a Node", (a) => CreateNode());
         evt.menu.AppendAction($"Save&Refresh", (a) => SaveAndRefresh());
         evt.menu.AppendAction($"ClearState", (a) => MissionNodeManager.Reinit());
+        evt.menu.AppendAction($"RefreshLogic", (a) => RefreshLogic());
+        evt.menu.AppendAction($"LoadFromLocal", (a) => PopulateView());
     }
 
     private void CreateNodeView(MissionNode node)
@@ -130,7 +133,13 @@ public class MissionFactoryView : GraphView
     private void SaveAndRefresh()
     {
         MissionNodeManager.SerialNode();
-        MissionNodeManager.Clear();
+        PopulateView();
+    }
+
+    private void RefreshLogic()
+    {
+        MissionNodeManager.RefreshLogicNode();
+        MissionNodeManager.SerialNode();
         PopulateView();
     }
 

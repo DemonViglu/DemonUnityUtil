@@ -99,7 +99,7 @@ public class MissionNetFactory : MonoBehaviour
     [ContextMenu("MakeFailure")]
     public void MakeFailure()
     {
-        MissionNodeManager.MakeFailure(ID);
+        MissionNodeManager.MakeMissionLock(ID);
     }
 
 

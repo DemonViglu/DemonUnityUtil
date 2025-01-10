@@ -1,8 +1,7 @@
-using demonviglu.config;
-using JetBrains.Annotations;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using Unity.VisualScripting;
 using UnityEngine;
 namespace demonviglu.MissonSystem
 {
@@ -25,6 +24,13 @@ namespace demonviglu.MissonSystem
 
         private List<MissionNode> LogicNode = new();
 
+        private MissionNodeConfig ConfigTool;
+
+        public MissionNodeManager(string ConfigName = "ActionConfig")
+        {
+            ConfigTool = new(ConfigName);
+        }
+
         #region For init and graphview
         public bool RegisterMissionNode(MissionNode node)
         {
@@ -40,6 +46,9 @@ namespace demonviglu.MissonSystem
 
                 if (node.MissionType != MissionType.Normal)
                 {
+                    //All State should re cal
+                    node.State = MissionState.Locked;
+
                     LogicNode.Add(node);
                 }
                 else if (node.State != MissionState.Success && node.State != MissionState.Hide)
@@ -129,21 +138,30 @@ namespace demonviglu.MissonSystem
         /// </summary>
         public void RefreshLogicNode()
         {
-            bool ret = true;
-            foreach (var node in LogicNode)
+            bool ret = false;
+
+            do
             {
-                switch (node.MissionType)
+                ret = false;
+
+                foreach (var node in LogicNode)
                 {
-                    case MissionType.And:
-                        ret = MakeAndProgress(node.ID, node, true, ret);
-                        break;
-                    case MissionType.Not:
-                        break;
-                    case MissionType.Or:
-                        ret = MakeOrProgress(node.ID, node, true, ret);
-                        break;
+                    switch (node.MissionType)
+                    {
+                        case MissionType.And:
+                            ret = MakeAndProgress(node.ID, node, true, ret);
+                            break;
+                        case MissionType.Not:
+                            ret = MakeNotProgress(node.ID, node, true, ret);
+                            break;
+                        case MissionType.Or:
+                            ret = MakeOrProgress(node.ID, node, true, ret);
+                            break;
+                    }
                 }
             }
+            while (ret);
+
         }
 
         #region Make Progress;
@@ -163,13 +181,23 @@ namespace demonviglu.MissonSystem
                         ret = MakeAndProgress(id, node, fromParent, ret);
                         break;
                     case MissionType.Not:
+                        ret = MakeNotProgress(id, node, fromParent, ret);
                         break;
                     case MissionType.Or:
                         ret = MakeOrProgress(id, node, fromParent, ret);
                         break;
+                    case MissionType.Locked:
+                        if (!LockedParentDic.ContainsKey(id) || LockedParentDic[id].Count == 0)
+                        {
+                            foreach (var childID in node.Childrens)
+                            {
+                                MakeMissionLock(childID);
+                            }
+                        }
+                        break;
                 }
 
-                //ÐèÒªÓÅ»¯£¬µ½µ×ÊÇÊ²Ã´Ê±ºò´¥·¢È«Ìåº¯Êý
+                //ï¿½ï¿½Òªï¿½Å»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê²Ã´Ê±ï¿½ò´¥·ï¿½È«ï¿½åº¯ï¿½ï¿½
                 if (true)
                 {
                     foreach (var e in EventList)
@@ -226,8 +254,11 @@ namespace demonviglu.MissonSystem
                         else
                         {
                             nextState = MissionState.Running;
+
+                            if (node.AutoSuccess) nextState = MissionState.Success;
+
+                            break;
                         }
-                        break;
                     case MissionState.Running:
                         nextState = MissionState.Success;
                         break;
@@ -251,8 +282,10 @@ namespace demonviglu.MissonSystem
 
                 if (nextState != MissionState.Locked)
                 {
-                    ret = true;
                 }
+
+                ret = true;
+
 
                 foreach (var childId in node.Childrens)
                 {
@@ -291,7 +324,7 @@ namespace demonviglu.MissonSystem
         /// <param name="fromParent"></param>
         /// <param name="ret"></param>
         /// <returns></returns>
-        public bool MakeAndProgress(int id, MissionNode node, bool fromParent, bool ret)
+        private bool MakeAndProgress(int id, MissionNode node, bool fromParent, bool ret)
         {
             MissionState nextState = node.State;
             if (fromParent)
@@ -299,12 +332,10 @@ namespace demonviglu.MissonSystem
                 if (LockedParentDic.ContainsKey(id) && LockedParentDic[id].Count > 0)
                 {
                     nextState = MissionState.Failure;
-                    ret = false;
                 }
                 else
                 {
                     nextState = MissionState.Success;
-                    ret = true;
                 }
 
                 //Logic state has changed, so change the children
@@ -312,6 +343,8 @@ namespace demonviglu.MissonSystem
                 {
                     node.State = nextState;
 
+                    ret = true;
+
                     if (nextState == MissionState.Success)
                     {
                         foreach (var childId in node.Childrens)
@@ -343,7 +376,7 @@ namespace demonviglu.MissonSystem
             return ret;
         }
 
-        public bool MakeOrProgress(int id, MissionNode node, bool fromParent, bool ret)
+        private bool MakeOrProgress(int id, MissionNode node, bool fromParent, bool ret)
         {
             MissionState nextState = node.State;
             if (fromParent)
@@ -351,18 +384,18 @@ namespace demonviglu.MissonSystem
                 //Has at least one node has been success
                 if (LockedParentDic.ContainsKey(id) && LockedParentDic[id].Count == ParentDic[id].Count)
                 {
-                    ret = false;
                     nextState = MissionState.Failure;
                 }
                 else
                 {
-                    ret = true;
                     nextState = MissionState.Success;
                 }
 
                 if (nextState != node.State)
                 {
                     node.State = nextState;
+
+                    ret = true;
 
                     if (nextState == MissionState.Success)
                     {
@@ -395,28 +428,89 @@ namespace demonviglu.MissonSystem
             return ret;
         }
 
-        public bool MakeFailure(int id)
+        private bool MakeNotProgress(int id, MissionNode node, bool fromParent, bool ret)
+        {
+            MissionState nextState = node.State;
+            if (fromParent)
+            {
+                //Has at least one node has not been success
+                if (LockedParentDic.ContainsKey(id) && LockedParentDic[id].Count > 0)
+                {
+                    nextState = MissionState.Success;
+                }
+                else
+                {
+                    nextState = MissionState.Failure;
+                }
+
+                if (nextState != node.State)
+                {
+                    node.State = nextState;
+
+                    ret = true;
+
+                    if (nextState == MissionState.Success)
+                    {
+                        foreach (var childId in node.Childrens)
+                        {
+                            if (LockedParentDic.ContainsKey(childId))
+                            {
+                                LockedParentDic[childId].Remove(node.ID);
+                            }
+                            MakeProgress(childId, true);
+                        }
+                    }
+                    else if (nextState == MissionState.Failure)
+                    {
+                        foreach (var childId in node.Childrens)
+                        {
+                            if (LockedParentDic.ContainsKey(childId))
+                            {
+                                LockedParentDic[childId].Add(node.ID);
+                            }
+                            else
+                            {
+                                LockedParentDic[childId] = new List<int>() { node.ID };
+                            }
+                            MakeProgress(childId, true);
+                        }
+                    }
+                }
+            }
+            return ret;
+        }
+
+        public bool MakeMissionLock(int id)
         {
             bool ret = false;
             MissionNode node = GetMissionNode(id);
+
+            MissionState nextState;
+
             if (node != null)
             {
                 if (node.State != MissionState.Locked)
                 {
-                    node.State = MissionState.Locked;
-                    foreach (var childId in node.Childrens)
+                    nextState = MissionState.Locked;
+
+                    if (node.State == MissionState.Success || node.State == MissionState.Hide)
                     {
-                        if (LockedParentDic.ContainsKey(childId))
+                        foreach (var childId in node.Childrens)
                         {
-                            LockedParentDic[childId].Add(node.ID);
+                            if (LockedParentDic.ContainsKey(childId))
+                            {
+                                LockedParentDic[childId].Add(node.ID);
+                            }
+                            else
+                            {
+                                LockedParentDic[childId] = new List<int>() { node.ID };
+                            }
+                            MakeProgress(childId, true);
                         }
-                        else
-                        {
-                            LockedParentDic[childId] = new List<int>() { node.ID };
-                        }
-                        MakeProgress(childId, true);
                     }
                     ret = true;
+
+                    node.State = nextState;
                 }
                 foreach (var e in EventList)
                 {
@@ -456,10 +550,8 @@ namespace demonviglu.MissonSystem
 
         public void Clear()
         {
-            //ID -> MissionNode
             Dic.Clear();
 
-            //The Mission's Node is been Locked because:
             LockedParentDic.Clear();
 
             ParentDic.Clear();
@@ -479,8 +571,8 @@ namespace demonviglu.MissonSystem
                 ret += (kv.Value.ToString()) + '\n';
             }
 
-            MissionNodeConfig config = new() { Data = ret };
-            config.SaveStr(config.Data);
+            ConfigTool.Data = ret;
+            ConfigTool.SaveStr(ConfigTool.Data);
 
             return ret;
         }
@@ -490,8 +582,7 @@ namespace demonviglu.MissonSystem
             List<MissionNode> ret = new();
             string s = string.Empty;
 
-            MissionNodeConfig config = new() { };
-            s = MissionNodeConfig.LoadStr<MissionNodeConfig>();
+            s = ConfigTool.LoadStr<MissionNodeConfig>();
             List<string> list = s.Split('\n').ToList();
             foreach (var item in list)
             {
@@ -506,11 +597,50 @@ namespace demonviglu.MissonSystem
         }
     }
 
-    public class MissionNodeConfig : BaseConfig
+    public class MissionNodeConfig
     {
+        public static string SaveFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        public static string SaveFolderName = "DemonConfig";
+
+        public string SaveFileName = "Default";
+
         public string Data
         {
             get; set;
         }
+
+        public MissionNodeConfig(string saveName = "DemonConfig")
+        {
+            SaveFileName = saveName;
+        }
+
+        public void SaveStr(string s)
+        {
+            string saveFullPath = Path.Combine(SaveFolderPath, SaveFolderName, SaveFileName + ".txt");
+
+
+            if (!Directory.Exists(Path.Combine(SaveFolderPath, SaveFolderName)))
+            {
+                Directory.CreateDirectory(Path.Combine(SaveFolderPath, SaveFolderName));
+            }
+
+
+            File.WriteAllText(saveFullPath, s);
+        }
+
+        public string LoadStr<T>()
+        {
+            if (File.Exists(Path.Combine(SaveFolderPath, SaveFolderName, SaveFileName + ".txt")))
+            {
+                string data = File.ReadAllText(Path.Combine(SaveFolderPath, SaveFolderName, SaveFileName + ".txt"));
+
+                return data;
+            }
+            else
+            {
+                return string.Empty;
+            }
+        }
     }
+
 }

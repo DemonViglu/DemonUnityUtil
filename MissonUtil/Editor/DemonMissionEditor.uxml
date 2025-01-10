@@ -1,7 +1,8 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
-    <Style src="project://database/Assets/MissonUtil/Editor/DemonMissionEditor.uss?fileID=7433441132597879392&amp;guid=a6bb38469515fa949ae5bcfa0432af2e&amp;type=3#DemonMissionEditor" />
+    <Style src="project://database/Assets/DemonUtil/MissonUtil/Editor/DemonMissionEditor.uss?fileID=7433441132597879392&amp;guid=a6bb38469515fa949ae5bcfa0432af2e&amp;type=3#DemonMissionEditor" />
     <uie:Toolbar>
         <uie:ToolbarMenu tabindex="-1" parse-escape-sequences="true" display-tooltip-when-elided="true" text="Assets" />
+        <ui:Toggle label="Refresh" view-data-key="RefreshToggle" name="RefreshToggle" />
     </uie:Toolbar>
     <MissionSplitView fixed-pane-initial-dimension="339">
         <ui:VisualElement style="flex-grow: 1;">
