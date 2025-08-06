@@ -1,0 +1,14 @@
+{
+	"name": "com.demontool.commontool",
+	"displayName": "DemonUtil",
+	"version": "1.0.0",
+	"unity": "2022.3",
+	"description": "GamePlayTag",
+	"keywords": [
+	  "Save"
+	],
+	"author": {
+	  "name": "DemonViglu",
+	  "url": "https://github.com/DemonViglu"
+	}
+}
